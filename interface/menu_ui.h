@@ -3,6 +3,10 @@
 
 #include "console_ui.h"
 #include "../accounts.h"
+#include "../karyawan.h"
+
+/* forward declaration supaya boleh dipanggil sebelum didefinisikan */
+static void menuKelolaDataKaryawan(void);
 
 /* ---------- Menu: Kelola Akun Karyawan (Superadmin) ---------- */
 
@@ -252,41 +256,116 @@ static void menuHapusKaryawan() {
 }
 
 /* READ: menampilkan daftar akun karyawan dari array (data sudah hasil load file) */
+/* READ: menampilkan daftar akun karyawan dalam bentuk tabel */
+/* READ: menampilkan daftar akun karyawan dalam bentuk tabel fullscreen + paging */
+/* READ: menampilkan daftar akun karyawan AKTIF dalam bentuk tabel fullscreen + paging */
 static void menuLihatKaryawan() {
-    ui_updateSize();
-    clearScreen();
-    drawBox(0, 0, g_cols, g_rows, "Daftar Akun Karyawan");
+    /* kalau masih kosong, isi dummy dulu (kalau kamu pakai fitur ini) */
+    accounts_seedDummyDataIfEmpty();
 
-    gotoXY(2, 2);
-    if (g_employeeCount == 0) {
-        printf("Belum ada akun karyawan.");
+    /* Kumpulkan hanya akun yang active == 1 */
+    int idxList[MAX_EMPLOYEES];
+    int activeCount = 0;
+    for (int i = 0; i < g_employeeCount; ++i) {
+        if (g_employees[i].active) {
+            idxList[activeCount++] = i;
+        }
+    }
+
+    if (activeCount == 0) {
+        ui_updateSize();
+        clearScreen();
+        drawBox(0, 0, g_cols, g_rows, "Daftar Akun Karyawan (AKTIF)");
+        gotoXY(2, 2);
+        printf("Belum ada akun karyawan AKTIF.");
         gotoXY(2, 4);
         printf("Tekan sembarang tombol untuk kembali...");
         _getch();
         return;
     }
 
-    int row = 4;
-    gotoXY(2, 2);
-    printf("Total karyawan (termasuk nonaktif): %d", g_employeeCount);
+    int page = 0;
 
-    /* Loop semua akun, tampilkan username, status, dan role */
-    for (int i = 0; i < g_employeeCount; ++i) {
-        Employee *e = &g_employees[i];
-        gotoXY(2, (short)row);
-        printf("%2d. %-20s | %-9s | %s",
-               i + 1,
-               e->username,
-               e->active ? "AKTIF" : "NONAKTIF",
-               roleToString(e->role));
-        row++;
-        if (row >= g_rows - 2) break;   /* jika layar penuh, break */
+    while (1) {
+        ui_updateSize();
+        clearScreen();
+
+        /* frame luar fullscreen */
+        drawBox(0, 0, g_cols, g_rows, "Daftar Akun Karyawan (AKTIF)");
+
+        int tableLeft = 2;
+        int headerRow = 3;
+
+        /* header tabel */
+        gotoXY((short)tableLeft, (short)headerRow);
+        printf("+----+----------------------+--------------------------+-----------+");
+        gotoXY((short)tableLeft, (short)(headerRow + 1));
+        printf("| No | Username             | Role                     | Status    |");
+        gotoXY((short)tableLeft, (short)(headerRow + 2));
+        printf("+----+----------------------+--------------------------+-----------+");
+
+        int dataTop = headerRow + 3;
+
+        /* berapa baris data per halaman? */
+        int availableRows = g_rows - dataTop - 5;
+        if (availableRows < 1) availableRows = 1;
+
+        int total = activeCount;
+        int totalPages = (total + availableRows - 1) / availableRows;
+        if (page < 0) page = 0;
+        if (page >= totalPages) page = totalPages - 1;
+
+        int startIndex = page * availableRows;
+        int endIndex   = startIndex + availableRows;
+        if (endIndex > total) endIndex = total;
+
+        int row = dataTop;
+        for (int i = startIndex; i < endIndex; ++i) {
+            int idx = idxList[i];
+            Employee *e = &g_employees[idx];
+
+            gotoXY((short)tableLeft, (short)row);
+            /* i+1 = nomor urut global berdasar data aktif */
+            printf("| %2d | %-20s | %-24s | %-9s |",
+                   i + 1,
+                   e->username,
+                   roleToString(e->role),
+                   e->active ? "AKTIF" : "NONAKTIF");
+            row++;
+        }
+
+        /* garis penutup tabel */
+        gotoXY((short)tableLeft, (short)row);
+        printf("+----+----------------------+--------------------------+-----------+");
+
+        gotoXY(2, (short)(row + 1));
+        printf("Total akun AKTIF: %d   Baris per halaman: %d", total, availableRows);
+        gotoXY(2, (short)(row + 2));
+        printf("Halaman %d dari %d", page + 1, totalPages);
+
+        gotoXY(2, (short)(g_rows - 2));
+        printf("N: Next   P: Prev   ESC: Kembali");
+
+        int ch = _getch();
+        if (ch == 0 || ch == 224) {
+            int code = _getch();
+            if (code == 77) {      /* Right arrow -> next */
+                if (page < totalPages - 1) page++;
+            } else if (code == 75) { /* Left arrow -> prev */
+                if (page > 0) page--;
+            }
+        } else if (ch == 'n' || ch == 'N') {
+            if (page < totalPages - 1) page++;
+        } else if (ch == 'p' || ch == 'P') {
+            if (page > 0) page--;
+        } else if (ch == 27) { /* ESC */
+            return;
+        }
     }
-
-    gotoXY(2, (short)(g_rows - 2));
-    printf("Tekan sembarang tombol untuk kembali...");
-    _getch();
 }
+
+
+
 
 /* MENU UTAMA CRUD: mengelola akun karyawan (C, R, U, D) */
 static void menuKelolaAkunKaryawan() {
@@ -484,11 +563,12 @@ static void menuKaryawanManager(const char *username) {
 /* ---------- Menu Utama Superadmin (layout mirip login) ---------- */
 /* ---------- Menu Utama Superadmin (menu terpusat dengan kotak) ---------- */
 /* ---------- Menu Utama Superadmin (tanpa panel kiri, menu di tengah) ---------- */
+/* ---------- Menu Utama Superadmin (tanpa panel kiri, menu di tengah) ---------- */
 static void mainMenuSuperadmin() {
     int selected = 0;
     const char *items[] = {
         "Kelola Akun Karyawan",
-        "Laporan Sistem (simulasi)",
+        "Kelola Data Karyawan",
         "Logout"
     };
     int itemCount = 3;
@@ -589,19 +669,14 @@ static void mainMenuSuperadmin() {
             if (selected == 0) {
                 menuKelolaAkunKaryawan();
             } else if (selected == 1) {
-                clearScreen();
-                drawBox(0, 0, g_cols, g_rows, "Laporan Sistem");
-                gotoXY(2, 2);
-                printf("Laporan Sistem masih simulasi.");
-                gotoXY(2, 4);
-                printf("Tekan sembarang tombol untuk kembali...");
-                _getch();
+                menuKelolaDataKaryawan();
             } else {
                 return; /* Logout */
             }
         }
     }
 }
+
 
 
 
@@ -679,5 +754,399 @@ static int ui_loginMenu() {
         }
     }
 }
+/* ---------- CRUD DATA KARYAWAN (DETAIL) ---------- */
+
+static void dataKaryawan_tambah() {
+    ui_updateSize();
+    clearScreen();
+    drawBox(0, 0, g_cols, g_rows, "Tambah Data Karyawan");
+
+    if (g_karyawanCount >= MAX_KARYAWAN) {
+        gotoXY(2, 2);
+        printf("Kapasitas data karyawan penuh (%d).", MAX_KARYAWAN);
+        gotoXY(2, 4);
+        printf("Tekan sembarang tombol untuk kembali...");
+        _getch();
+        return;
+    }
+
+    Karyawan k;
+    memset(&k, 0, sizeof(Karyawan));
+
+    gotoXY(2, 2);
+    printf("Masukkan ID Karyawan (max 10, ESC batal): ");
+    if (!inputText(k.id, sizeof(k.id))) return;
+
+    if (karyawan_findById(k.id) >= 0) {
+        gotoXY(2, 4);
+        printf("ID karyawan sudah terdaftar.");
+        gotoXY(2, 6);
+        printf("Tekan sembarang tombol untuk kembali...");
+        _getch();
+        return;
+    }
+
+    gotoXY(2, 4);
+    printf("Nama Karyawan (max 50, ESC batal): ");
+    if (!inputText(k.nama, sizeof(k.nama))) return;
+
+    gotoXY(2, 6);
+    printf("Email (max 100, ESC batal): ");
+    if (!inputText(k.email, sizeof(k.email))) return;
+
+    gotoXY(2, 8);
+    printf("Tanggal Lahir (YYYY-MM-DD, ESC batal): ");
+    if (!inputText(k.tanggalLahir, sizeof(k.tanggalLahir))) return;
+
+    gotoXY(2, 10);
+    printf("Jenis Kelamin (L/P, ESC batal): ");
+    char jkBuf[4] = {0};
+    if (!inputText(jkBuf, sizeof(jkBuf))) return;
+    k.jenisKelamin = (jkBuf[0] == 'p' || jkBuf[0] == 'P') ? 'P' : 'L';
+
+    gotoXY(2, 12);
+    printf("No. Telp (max 10, ESC batal): ");
+    if (!inputText(k.noTelp, sizeof(k.noTelp))) return;
+
+    gotoXY(2, 14);
+    printf("Jabatan (max 20, ESC batal): ");
+    if (!inputText(k.jabatan, sizeof(k.jabatan))) return;
+
+    k.active = 1;
+
+    if (!karyawan_add(&k)) {
+        gotoXY(2, 16);
+        printf("Gagal menambah data karyawan (kapasitas penuh / ID duplikat).");
+    } else {
+        gotoXY(2, 16);
+        printf("Data karyawan dengan ID '%s' berhasil ditambahkan.", k.id);
+    }
+
+    gotoXY(2, 18);
+    printf("Tekan sembarang tombol untuk kembali...");
+    _getch();
+}
+
+static void dataKaryawan_ubah() {
+    ui_updateSize();
+    clearScreen();
+    drawBox(0, 0, g_cols, g_rows, "Ubah Data Karyawan");
+
+    if (g_karyawanCount == 0) {
+        gotoXY(2, 2);
+        printf("Belum ada data karyawan.");
+        gotoXY(2, 4);
+        printf("Tekan sembarang tombol untuk kembali...");
+        _getch();
+        return;
+    }
+
+    char id[11];
+    gotoXY(2, 2);
+    printf("Masukkan ID Karyawan yang akan diubah (ESC batal): ");
+    if (!inputText(id, sizeof(id))) return;
+
+    int idx = karyawan_findById(id);
+    if (idx < 0) {
+        gotoXY(2, 4);
+        printf("Data dengan ID '%s' tidak ditemukan / nonaktif.", id);
+        gotoXY(2, 6);
+        printf("Tekan sembarang tombol untuk kembali...");
+        _getch();
+        return;
+    }
+
+    Karyawan k = g_karyawan[idx];
+
+    int done = 0;
+    while (!done) {
+        ui_updateSize();
+        clearScreen();
+        drawBox(0, 0, g_cols, g_rows, "Ubah Data Karyawan");
+
+        gotoXY(2, 2);
+        printf("ID          : %s", k.id);
+        gotoXY(2, 3);
+        printf("Nama        : %s", k.nama);
+        gotoXY(2, 4);
+        printf("Email       : %s", k.email);
+        gotoXY(2, 5);
+        printf("Tgl Lahir   : %s", k.tanggalLahir);
+        gotoXY(2, 6);
+        printf("Jenis Kelamin : %c", k.jenisKelamin);
+        gotoXY(2, 7);
+        printf("No. Telp    : %s", k.noTelp);
+        gotoXY(2, 8);
+        printf("Jabatan     : %s", k.jabatan);
+        gotoXY(2, 9);
+        printf("Status      : %s", k.active ? "AKTIF" : "NONAKTIF");
+
+        gotoXY(2, 11);
+        printf("[1] Ubah Nama");
+        gotoXY(2, 12);
+        printf("[2] Ubah Email");
+        gotoXY(2, 13);
+        printf("[3] Ubah Tanggal Lahir");
+        gotoXY(2, 14);
+        printf("[4] Ubah Jenis Kelamin");
+        gotoXY(2, 15);
+        printf("[5] Ubah No. Telp");
+        gotoXY(2, 16);
+        printf("[6] Ubah Jabatan");
+        gotoXY(2, 17);
+        printf("[0] Kembali");
+
+        gotoXY(2, 19);
+        printf("Pilih menu: ");
+
+        int ch = _getch();
+        if (ch == '0' || ch == 27) {
+            done = 1;
+        } else if (ch == '1') {
+            gotoXY(2, 21);
+            printf("Nama baru (ESC batal): ");
+            if (inputText(k.nama, sizeof(k.nama))) {
+                karyawan_update(idx, &k);
+            }
+        } else if (ch == '2') {
+            gotoXY(2, 21);
+            printf("Email baru (ESC batal): ");
+            if (inputText(k.email, sizeof(k.email))) {
+                karyawan_update(idx, &k);
+            }
+        } else if (ch == '3') {
+            gotoXY(2, 21);
+            printf("Tgl lahir baru YYYY-MM-DD (ESC batal): ");
+            if (inputText(k.tanggalLahir, sizeof(k.tanggalLahir))) {
+                karyawan_update(idx, &k);
+            }
+        } else if (ch == '4') {
+            gotoXY(2, 21);
+            printf("Jenis kelamin baru (L/P, ESC batal): ");
+            char buf[4] = {0};
+            if (inputText(buf, sizeof(buf))) {
+                k.jenisKelamin = (buf[0] == 'p' || buf[0] == 'P') ? 'P' : 'L';
+                karyawan_update(idx, &k);
+            }
+        } else if (ch == '5') {
+            gotoXY(2, 21);
+            printf("No. telp baru (ESC batal): ");
+            if (inputText(k.noTelp, sizeof(k.noTelp))) {
+                karyawan_update(idx, &k);
+            }
+        } else if (ch == '6') {
+            gotoXY(2, 21);
+            printf("Jabatan baru (ESC batal): ");
+            if (inputText(k.jabatan, sizeof(k.jabatan))) {
+                karyawan_update(idx, &k);
+            }
+        }
+    }
+}
+
+static void dataKaryawan_hapus() {
+    ui_updateSize();
+    clearScreen();
+    drawBox(0, 0, g_cols, g_rows, "Hapus / Nonaktifkan Data Karyawan");
+
+    if (g_karyawanCount == 0) {
+        gotoXY(2, 2);
+        printf("Belum ada data karyawan.");
+        gotoXY(2, 4);
+        printf("Tekan sembarang tombol untuk kembali...");
+        _getch();
+        return;
+    }
+
+    char id[11];
+    gotoXY(2, 2);
+    printf("Masukkan ID Karyawan yang akan dihapus (ESC batal): ");
+    if (!inputText(id, sizeof(id))) return;
+
+    int idx = karyawan_findById(id);
+    if (idx < 0) {
+        gotoXY(2, 4);
+        printf("Data dengan ID '%s' tidak ditemukan / sudah nonaktif.", id);
+        gotoXY(2, 6);
+        printf("Tekan sembarang tombol untuk kembali...");
+        _getch();
+        return;
+    }
+
+    Karyawan *k = &g_karyawan[idx];
+
+    gotoXY(2, 4);
+    printf("Yakin ingin menonaktifkan karyawan '%s' (%s)?",
+           k->id, k->nama);
+    gotoXY(2, 6);
+    printf("Tekan Y untuk konfirmasi, tombol lain untuk batal.");
+
+    int ch = _getch();
+    if (ch == 'y' || ch == 'Y') {
+        karyawan_softDelete(idx);
+        gotoXY(2, 8);
+        printf("Data karyawan telah dinonaktifkan.");
+        gotoXY(2, 10);
+        printf("Tekan sembarang tombol untuk kembali...");
+        _getch();
+    }
+}
+
+/* Lihat data karyawan AKTIF dalam bentuk tabel fullscreen + paging */
+static void dataKaryawan_lihat() {
+    /* kumpulkan hanya yang active == 1 */
+    int idxList[MAX_KARYAWAN];
+    int activeCount = 0;
+    for (int i = 0; i < g_karyawanCount; ++i) {
+        if (g_karyawan[i].active) {
+            idxList[activeCount++] = i;
+        }
+    }
+
+    if (activeCount == 0) {
+        ui_updateSize();
+        clearScreen();
+        drawBox(0, 0, g_cols, g_rows, "Daftar Data Karyawan (AKTIF)");
+        gotoXY(2, 2);
+        printf("Belum ada data karyawan AKTIF.");
+        gotoXY(2, 4);
+        printf("Tekan sembarang tombol untuk kembali...");
+        _getch();
+        return;
+    }
+
+    int page = 0;
+
+    while (1) {
+        ui_updateSize();
+        clearScreen();
+        drawBox(0, 0, g_cols, g_rows, "Daftar Data Karyawan (AKTIF)");
+
+        int left = 2;
+        int headerRow = 3;
+
+        /* header tabel (sesuai struktur ERD) */
+        gotoXY((short)left, (short)headerRow);
+        printf("+----+------------+----------------------+--------------------------+------------+-----+------------+----------------+");
+        gotoXY((short)left, (short)(headerRow + 1));
+        printf("| No | ID         | Nama                 | Email                    | Tgl Lahir  | JK  | No. Telp   | Jabatan        |");
+        gotoXY((short)left, (short)(headerRow + 2));
+        printf("+----+------------+----------------------+--------------------------+------------+-----+------------+----------------+");
+
+        int dataTop = headerRow + 3;
+        int availableRows = g_rows - dataTop - 5;
+        if (availableRows < 1) availableRows = 1;
+
+        int total = activeCount;
+        int totalPages = (total + availableRows - 1) / availableRows;
+        if (page < 0) page = 0;
+        if (page >= totalPages) page = totalPages - 1;
+
+        int startIndex = page * availableRows;
+        int endIndex   = startIndex + availableRows;
+        if (endIndex > total) endIndex = total;
+
+        int row = dataTop;
+        for (int i = startIndex; i < endIndex; ++i) {
+            int idx = idxList[i];
+            Karyawan *k = &g_karyawan[idx];
+
+            gotoXY((short)left, (short)row);
+            printf("| %2d | %-10s | %-20s | %-24s | %-10s | %-3c | %-10s | %-14s |",
+                   i + 1,
+                   k->id,
+                   k->nama,
+                   k->email,
+                   k->tanggalLahir,
+                   k->jenisKelamin,
+                   k->noTelp,
+                   k->jabatan);
+            row++;
+        }
+
+        gotoXY((short)left, (short)row);
+        printf("+----+------------+----------------------+--------------------------+------------+-----+------------+----------------+");
+
+        gotoXY(2, (short)(row + 1));
+        printf("Total karyawan AKTIF: %d   Baris per halaman: %d", total, availableRows);
+        gotoXY(2, (short)(row + 2));
+        printf("Halaman %d dari %d", page + 1, totalPages);
+
+        gotoXY(2, (short)(g_rows - 2));
+        printf("N: Next   P: Prev   ESC: Kembali");
+
+        int ch = _getch();
+        if (ch == 0 || ch == 224) {
+            int code = _getch();
+            if (code == 77) { /* Right arrow */
+                if (page < totalPages - 1) page++;
+            } else if (code == 75) { /* Left arrow */
+                if (page > 0) page--;
+            }
+        } else if (ch == 'n' || ch == 'N') {
+            if (page < totalPages - 1) page++;
+        } else if (ch == 'p' || ch == 'P') {
+            if (page > 0) page--;
+        } else if (ch == 27) {
+            return;
+        }
+    }
+}
+
+
+static void menuKelolaDataKaryawan() {
+    int selected = 0;
+    const char *items[] = {
+        "Tambah Data Karyawan",
+        "Ubah Data Karyawan",
+        "Hapus / Nonaktifkan Data",
+        "Lihat Data Karyawan",
+        "Kembali"
+    };
+    int itemCount = 5;
+
+    while (1) {
+        ui_updateSize();
+        clearScreen();
+        drawBox(0, 0, g_cols, g_rows, "Kelola Data Karyawan");
+
+        int boxW = 60;
+        int boxH = 11;
+        int left = (g_cols - boxW) / 2;
+        int top  = (g_rows - boxH) / 2;
+
+        drawBox(left, top, boxW, boxH, "");
+
+        gotoXY((short)(left + 2), (short)(top + 2));
+        printf("Pilih menu:");
+
+        for (int i = 0; i < itemCount; ++i) {
+            gotoXY((short)(left + 4), (short)(top + 3 + i));
+            if (i == selected)
+                printf("-> %s", items[i]);
+            else
+                printf("   %s", items[i]);
+        }
+
+        gotoXY((short)(left + 2), (short)(top + boxH - 2));
+        printf("Panah atas/bawah, ENTER pilih, ESC kembali");
+
+        int ch = _getch();
+        if (ch == 0 || ch == 224) {
+            int code = _getch();
+            if (code == 72)       selected = (selected - 1 + itemCount) % itemCount;
+            else if (code == 80)  selected = (selected + 1) % itemCount;
+        } else if (ch == 27) {
+            return;
+        } else if (ch == 13) {
+            if      (selected == 0) dataKaryawan_tambah();
+            else if (selected == 1) dataKaryawan_ubah();
+            else if (selected == 2) dataKaryawan_hapus();
+            else if (selected == 3) dataKaryawan_lihat();
+            else return;
+        }
+    }
+}
+
 
 #endif /* MENU_UI_H */

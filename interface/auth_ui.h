@@ -135,14 +135,12 @@ static int loginSuperadmin() {
         setCursorVisible(0);
 
         if (strcmp(username, SUPER_USER) == 0 &&
-            strcmp(password, SUPER_PASS) == 0) {
-            gotoXY(35, 22);
-            printf("Login berhasil sebagai Superadmin.");
-            gotoXY(35, 23);
-            printf("Tekan sembarang tombol untuk ke Menu Utama...");
-            _getch();
+      strcmp(password, SUPER_PASS) == 0) {
+            /* loading kedua: setelah login berhasil, sebelum menu utama */
+            ui_showLoading("Login Berhasil", "Memuat Menu Superadmin...");
             return 1;
-        } else {
+      } else {
+
             gotoXY(35, 22);
             printf("Login gagal! Nama pengguna / kata sandi salah.");
             gotoXY(35, 23);
@@ -201,18 +199,21 @@ static int loginKaryawan(Role *outRole, char *outUsername, int outUsernameSize) 
 
         if (found >= 0) {
             Employee *e = &g_employees[found];
-            gotoXY(35, 22);
-            printf("Login berhasil sebagai %s.", roleToString(e->role));
-            gotoXY(35, 23);
-            printf("Tekan sembarang tombol untuk ke Menu Utama...");
-            _getch();
+
             if (outRole) *outRole = e->role;
             if (outUsername && outUsernameSize > 0) {
                 strncpy(outUsername, e->username, outUsernameSize - 1);
                 outUsername[outUsernameSize - 1] = '\0';
             }
+
+            /* loading kedua: setelah login berhasil, sebelum menu role */
+            char sub[64];
+            snprintf(sub, sizeof(sub), "Sebagai %s", roleToString(e->role));
+            ui_showLoading("Login Berhasil", sub);
+
             return 1;
         } else {
+
             gotoXY(35, 22);
             printf("Login gagal! Username/kata sandi salah atau akun tidak aktif.");
             gotoXY(35, 23);

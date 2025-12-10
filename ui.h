@@ -30,23 +30,23 @@ void ui_initConsole() {
 
 /* flow utama: menu pilih role -> loading -> login -> menu utama */
 void ui_run() {
-    /* load semua akun karyawan dari file saat start */
+    /* load semua akun dan data karyawan */
     accounts_init();
+    karyawan_init();
 
     while (1) {
         int choice = ui_loginMenu();
         if (choice == 2) {
-            /* Keluar */
-            return;
+            return; /* Keluar */
         } else if (choice == 0) {
-            /* Superadmin */
-            ui_showLoading("Superadmin");
+            /* Loading sebelum tampil form login Superadmin */
+            ui_showLoading("Memuat Halaman Login", "Login Superadmin");
             if (loginSuperadmin()) {
                 mainMenuSuperadmin();
             }
         } else if (choice == 1) {
-            /* Karyawan */
-            ui_showLoading("Karyawan");
+            /* Loading sebelum tampil form login Karyawan */
+            ui_showLoading("Memuat Halaman Login", "Login Karyawan");
             Role role;
             char username[MAX_INPUT];
             if (loginKaryawan(&role, username, MAX_INPUT)) {
@@ -55,5 +55,6 @@ void ui_run() {
         }
     }
 }
+
 
 #endif /* UI_H */

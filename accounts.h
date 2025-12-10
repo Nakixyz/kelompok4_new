@@ -163,5 +163,44 @@ static void accounts_softDelete(int index) {
     g_employees[index].active = 0;
     accounts_saveToFile();
 }
+/* ===================================================================== */
+/*                   SEED: 50 DATA DUMMY KARYAWAN                        */
+/* ===================================================================== */
+/* Dipakai kalau mau isi awal accounts.dat dengan data contoh.
+   Pola:
+     username : emp01 .. emp50
+     password : pw01 .. pw50
+     role     : di-rotasi (Pembayaran, Jadwal, Data, Manager)
+*/
+static void accounts_seedDummyDataIfEmpty() {
+    /* Kalau sudah ada data di memori, jangan seed lagi
+       supaya tidak dobel-dobel */
+    if (g_employeeCount > 0) return;
+
+    /* pola role untuk dirotasi */
+    const Role rolePattern[] = {
+        ROLE_PEMBAYARAN,
+        ROLE_JADWAL,
+        ROLE_DATA,
+        ROLE_MANAGER
+    };
+    int roleCount = 4;
+
+    char uname[32];
+    char pass[32];
+
+    for (int i = 1; i <= 50 && g_employeeCount < MAX_EMPLOYEES; ++i) {
+        /* username: emp01, emp02, ..., emp50 */
+        snprintf(uname, sizeof(uname), "emp%02d", i);
+        /* password: pw01, pw02, ..., pw50 */
+        snprintf(pass, sizeof(pass), "pw%02d", i);
+
+        /* rotasi role: 1: pembayaran, 2: jadwal, 3: data, 4: manager, lalu ulang */
+        Role r = rolePattern[(i - 1) % roleCount];
+
+        /* accounts_add akan set active = 1 dan langsung simpan ke file .dat */
+        accounts_add(uname, pass, r);
+    }
+}
 
 #endif /* ACCOUNTS_H */

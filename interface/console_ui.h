@@ -203,31 +203,75 @@ static int inputPassword(char *buffer, int maxLen) {
 
 /* ---------- Loading kecil ---------- */
 
-static void ui_showLoading(const char *roleLabel) {
+/* ---------- Loading Screen Umum (fullscreen + progress bar) ---------- */
+static void ui_showLoading(const char *title, const char *subtitle) {
     ui_updateSize();
     clearScreen();
+    setCursorVisible(0);
 
-    int outerLeft = 0, outerTop = 0;
-    int outerWidth = g_cols;
-    int outerHeight = g_rows;
+    /* frame luar */
+    drawBox(0, 0, g_cols, g_rows, "");
 
-    drawBox(outerLeft, outerTop, outerWidth, outerHeight, "");
+    /* ukuran box loading di tengah */
+    int boxW = 60;
+    int boxH = 8;
+    if (boxW > g_cols - 4) boxW = g_cols - 4;
+    if (boxH > g_rows - 4) boxH = g_rows - 4;
 
-    int boxW = 34;
-    int boxH = 5;
-    int left = outerLeft + (outerWidth - boxW) / 2;
-    int top  = outerTop + (outerHeight - boxH) / 2;
+    int left = (g_cols - boxW) / 2;
+    int top  = (g_rows - boxH) / 2;
 
     drawBox(left, top, boxW, boxH, "");
 
-    for (int i = 0; i <= 6; ++i) {
-        gotoXY((short)(left + 2), (short)(top + 2));
-        printf("Loading %s", roleLabel);
-        int dots = i % 4;
-        for (int d = 0; d < dots; ++d) putchar('.');
-        fflush(stdout);
-        Sleep(250);
+    /* judul */
+    if (title && title[0] != '\0') {
+        int tlen = (int)strlen(title);
+        int tx = left + (boxW - tlen) / 2;
+        if (tx < left + 2) tx = left + 2;
+        gotoXY((short)tx, (short)(top + 1));
+        printf("%s", title);
+    }
+
+    /* sub judul */
+    if (subtitle && subtitle[0] != '\0') {
+        int slen = (int)strlen(subtitle);
+        int sx = left + (boxW - slen) / 2;
+        if (sx < left + 2) sx = left + 2;
+        gotoXY((short)sx, (short)(top + 2));
+        printf("%s", subtitle);
+    }
+
+    /* progress bar */
+    int barWidth = boxW - 10;
+    if (barWidth < 10) barWidth = 10;
+    int barLeft = left + (boxW - barWidth) / 2;
+    int barTop  = top + 4;
+
+    int totalSteps = barWidth - 2;   /* bagian dalam [=====] */
+
+    for (int step = 0; step <= totalSteps; ++step) {
+        /* gambar outline bar */
+        gotoXY((short)barLeft, (short)barTop);
+        putchar('[');
+        for (int i = 0; i < barWidth - 2; ++i) {
+            if (i < step) putchar('#');
+            else          putchar(' ');
+        }
+        putchar(']');
+
+        /* persentase di bawah bar */
+        int percent = (step * 100) / (totalSteps == 0 ? 1 : totalSteps);
+        char pctStr[8];
+        snprintf(pctStr, sizeof(pctStr), "%3d%%", percent);
+
+        int pctLen = (int)strlen(pctStr);
+        int px = barLeft + (barWidth - pctLen) / 2;
+        gotoXY((short)px, (short)(barTop + 1));
+        printf("%s", pctStr);
+
+        Sleep(40); /* kecepatan animasi */
     }
 }
+
 
 #endif /* CONSOLE_UI_H */
