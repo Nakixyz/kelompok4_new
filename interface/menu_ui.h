@@ -10,7 +10,7 @@
 /*                       CRUD AKUN KARYAWAN (LOGIN)                      */
 /* ===================================================================== */
 
-/* CREATE: menambah akun karyawan baru melalui UI */
+/* CREATE: menambah akun karyawan b5aru melalui UI */
 static void menuTambahKaryawan() {
     ui_updateSize();
     clearScreen();
