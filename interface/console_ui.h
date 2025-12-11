@@ -94,6 +94,130 @@ static void drawInputBox(int left, int top, int width) {
 /* ---------- Input helper umum ---------- */
 
 /* input text biasa (username, nama, dsb), ESC mengembalikan 0, Enter = 1 */
+/* ================== INPUT TANPA SPASI (KHUSUS LOGIN) ================== */
+
+/* Versi inputText yang meng-IGNORE spasi:
+   - ESC  -> return 0
+   - Enter-> return 1
+   - Spasi tidak disimpan & tidak ditampilkan
+*/
+static int inputTextNoSpace(char *buffer, int maxLen) {
+    int len = 0;
+    buffer[0] = '\0';
+
+    while (1) {
+        int ch = _getch();
+
+        if (ch == 0 || ch == 224) {
+            _getch();  /* ignore tombol arah/fungsi */
+            continue;
+        }
+
+        if (ch == 27) { /* ESC */
+            buffer[0] = '\0';
+            return 0;
+        } else if (ch == 13) { /* Enter */
+            buffer[len] = '\0';
+            return 1;
+        } else if (ch == 8) { /* Backspace */
+            if (len > 0) {
+                len--;
+                buffer[len] = '\0';
+                printf("\b \b");
+                fflush(stdout);
+            }
+        } else if (ch >= 32 && ch <= 126) { /* karakter biasa */
+            if (ch == ' ') {
+                /* IGNORE spasi: tidak simpan, tidak tampil */
+                continue;
+            }
+            if (len < maxLen - 1) {
+                buffer[len++] = (char) ch;
+                buffer[len] = '\0';
+                putchar(ch);
+                fflush(stdout);
+            }
+        }
+    }
+}
+
+/* Versi inputPassword yang meng-IGNORE spasi:
+   - Spasi tidak disimpan & tidak tampil (baik mode * maupun mode show)
+*/
+static int inputPasswordNoSpace(char *buffer, int maxLen) {
+    int len = 0;
+    int show = 0;
+    buffer[0] = '\0';
+
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    GetConsoleScreenBufferInfo(h, &csbi);
+    short startX = csbi.dwCursorPosition.X;
+    short startY = csbi.dwCursorPosition.Y;
+
+    while (1) {
+        int ch = _getch();
+
+        if (ch == 0 || ch == 224) {
+            _getch();   /* ignore tombol khusus (arrow, function) */
+            continue;
+        }
+
+        if (ch == 27) { /* ESC */
+            buffer[0] = '\0';
+            return 0;
+        } else if (ch == 13) { /* Enter */
+            buffer[len] = '\0';
+            return 1;
+        } else if (ch == 9) { /* TAB -> toggle show/hide */
+            int i;
+            show = !show;
+            gotoXY(startX, startY);
+            for (i = 0; i < len; ++i) putchar(' ');
+            gotoXY(startX, startY);
+
+            if (show) {
+                for (i = 0; i < len; ++i) putchar(buffer[i]);
+            } else {
+                for (i = 0; i < len; ++i) putchar('*');
+            }
+            fflush(stdout);
+        } else if (ch == 8) { /* Backspace */
+            if (len > 0) {
+                int i;
+                len--;
+                buffer[len] = '\0';
+                gotoXY(startX, startY);
+                if (show) {
+                    for (i = 0; i < len; ++i) putchar(buffer[i]);
+                } else {
+                    for (i = 0; i < len; ++i) putchar('*');
+                }
+                putchar(' ');
+                gotoXY(startX + len, startY);
+                fflush(stdout);
+            }
+        } else if (ch >= 32 && ch <= 126) {
+            if (ch == ' ') {
+                /* IGNORE spasi di password login */
+                continue;
+            }
+            if (len < maxLen - 1) {
+                int i;
+                buffer[len++] = (char) ch;
+                buffer[len] = '\0';
+                if (show) {
+                    gotoXY(startX, startY);
+                    for (i = 0; i < len; ++i) putchar(buffer[i]);
+                } else {
+                    putchar('*');
+                }
+                fflush(stdout);
+            }
+        }
+    }
+}
+
 static int inputText(char *buffer, int maxLen) {
     int len = 0;
     buffer[0] = '\0';
